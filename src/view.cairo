@@ -24,7 +24,7 @@ mod View {
     struct Storage {}
 
 
-    #[external(v0)]
+    #[abi(embed_v0)]
     impl MulticallsView of IView<ContractState> {
         fn standard_multicall(self: @ContractState, calls: Array<Call>) -> Array<Span<felt252>> {
             execute_sequence(calls)
@@ -35,31 +35,26 @@ mod View {
         }
     }
 
-    #[internal]
     fn execute_composition(mut calls: Array<Call>) -> Array<Span<felt252>> {
         let mut res = ArrayTrait::new();
         loop {
             match calls.pop_front() {
                 Option::Some(call) => {
                     let Call{to, selector, calldata } = call;
-                    let compiled_calldata = compile_calldata(res.span(), calldata.span());
-                    let _res = starknet::call_contract_syscall(to, selector, calldata.span())
-                        .unwrap();
+                    let _compiled_calldata = compile_calldata(res.span(), calldata);
+                    let _res = starknet::call_contract_syscall(to, selector, calldata).unwrap();
                     res.append(_res);
                 },
-                Option::None(_) => {
-                    break ();
-                },
+                Option::None(_) => { break (); },
             };
         };
         res
     }
 
-    #[internal]
     fn compile_calldata(res: Span<Span<felt252>>, mut calldata: Span<felt252>) -> Array<felt252> {
         match calldata.pop_front() {
             Option::Some(felt) => {
-                let mut output_calldata = (if *felt == 0 {
+                let mut _output_calldata = (if *felt == 0 {
                     *calldata.pop_front().expect('expected a felt after prefix 0')
                 } else if *felt == 1 {
                     *(*(res
@@ -87,7 +82,6 @@ mod View {
         }
     }
 
-    #[internal]
     fn execute_sequence(mut calls: Array<Call>) -> Array<Span<felt252>> {
         let mut res = ArrayTrait::new();
         loop {
@@ -96,17 +90,14 @@ mod View {
                     let _res = _execute_single_call(call);
                     res.append(_res);
                 },
-                Option::None(_) => {
-                    break ();
-                },
+                Option::None(_) => { break (); },
             };
         };
         res
     }
 
-    #[internal]
     fn _execute_single_call(call: Call) -> Span<felt252> {
         let Call{to, selector, calldata } = call;
-        starknet::call_contract_syscall(to, selector, calldata.span()).unwrap()
+        starknet::call_contract_syscall(to, selector, calldata).unwrap()
     }
 }
